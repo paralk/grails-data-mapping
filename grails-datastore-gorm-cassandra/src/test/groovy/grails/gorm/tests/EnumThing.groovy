@@ -1,11 +1,10 @@
-package grails.gorm.tests;
+package grails.gorm.tests
 
-import grails.persistence.Entity;
+import grails.gorm.CassandraEntity
 
-import java.util.UUID;
-
-@Entity
+@CassandraEntity
 class EnumThing {
+    
     UUID id
     Long version
     String name
