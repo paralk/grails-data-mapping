@@ -71,6 +71,7 @@ import com.datastax.driver.core.Row;
 import com.datastax.driver.core.Session;
 import com.datastax.driver.core.Statement;
 import com.datastax.driver.core.querybuilder.Delete;
+import com.datastax.driver.core.querybuilder.Insert;
 import com.datastax.driver.core.querybuilder.QueryBuilder;
 import com.datastax.driver.core.querybuilder.Update;
 
@@ -119,13 +120,13 @@ public class CassandraEntityPersister extends NativeEntryEntityPersister<EntityA
 	}
 
 	@Override
-	protected EntityAccess createEntityAccess(PersistentEntity persistentEntity, Object obj) {
-		return new CassandraEntityAccess(persistentEntity, obj);
+	protected EntityAccess createEntityAccess(PersistentEntity persistentEntity, Object object) {
+		return new CassandraEntityAccess(persistentEntity, object);
 	}
 
 	@Override
-	protected EntityAccess createEntityAccess(PersistentEntity persistentEntity, Object obj, final EntityAccess nativeEntry) {
-		final CassandraEntityAccess ea = new CassandraEntityAccess(persistentEntity, obj);
+	protected EntityAccess createEntityAccess(PersistentEntity persistentEntity, Object object, final EntityAccess nativeEntry) {
+		final CassandraEntityAccess ea = new CassandraEntityAccess(persistentEntity, object);
 		ea.setNativeEntry(nativeEntry);
 		return ea;
 	}
@@ -182,9 +183,9 @@ public class CassandraEntityPersister extends NativeEntryEntityPersister<EntityA
 
         cacheNativeEntry(persistentEntity, nativeKey, nativeEntry);
 
-        Object obj = nativeEntry.getEntity();
-        refreshObjectStateFromNativeEntry(persistentEntity, obj, nativeKey, nativeEntry, false);
-        return obj;
+        Object object = nativeEntry.getEntity();
+        refreshObjectStateFromNativeEntry(persistentEntity, object, nativeKey, nativeEntry, false);
+        return object;
     }
 
 	@Override
@@ -372,8 +373,8 @@ public class CassandraEntityPersister extends NativeEntryEntityPersister<EntityA
 	}
 	
 	@Override
-	public void setObjectIdentifier(Object obj, Serializable id) {
-		new CassandraEntityAccess(getPersistentEntity(), obj).setIdentifier(id);
+	public void setObjectIdentifier(Object object, Serializable id) {
+		new CassandraEntityAccess(getPersistentEntity(), object).setIdentifier(id);
 	}
 
 	@Override
@@ -391,18 +392,26 @@ public class CassandraEntityPersister extends NativeEntryEntityPersister<EntityA
 		return null;
 	}
 
-	public Object update(Object obj) {
-		return update(obj, false);
+	public Insert createInsert(Object object, WriteOptions writeOptions) {
+		return CassandraTemplate.createInsertQuery(getTableName(), object, writeOptions, cassandraTemplate.getConverter());
 	}
 	
-	public Object updateSingleTypes(Object obj) {
-		return update(obj, true);
+	public Update createUpdate(Object object, WriteOptions writeOptions) {
+		return CassandraTemplate.toUpdateQuery(getTableName(), object, writeOptions, cassandraTemplate.getConverter());		
 	}
 	
-	public Object update(Object obj, final boolean simpleTypesOnly) {
+	public Object update(Object object) {
+		return update(object, false);
+	}
+	
+	public Object updateSingleTypes(Object object) {
+		return update(object, true);
+	}
+	
+	public Object update(Object object, final boolean simpleTypesOnly) {
 		final PersistentEntity persistentEntity = getPersistentEntity();
-		final EntityAccess entityAccess = createEntityAccess(persistentEntity, obj);
-		final Object key = readIdentifierFromObject(obj);
+		final EntityAccess entityAccess = createEntityAccess(persistentEntity, object);
+		final Object key = readIdentifierFromObject(object);
 		PendingUpdate<EntityAccess, Object> pendingUpdate = new PendingUpdateAdapter<EntityAccess, Object>(persistentEntity, key, entityAccess, entityAccess) {
 			public void run() {
 				updateEntry(entity, getEntityAccess(), getNativeKey(), getNativeEntry(), simpleTypesOnly);
@@ -443,8 +452,8 @@ public class CassandraEntityPersister extends NativeEntryEntityPersister<EntityA
 		return prepareUpdate(id, update, writeOptions);		
 	}
 	
-	public void append(Object obj, String propertyName, Object element, WriteOptions writeOptions) {
-		Serializable id = (Serializable) readIdentifierFromObject(obj);
+	public void append(Object object, String propertyName, Object element, WriteOptions writeOptions) {
+		Serializable id = (Serializable) readIdentifierFromObject(object);
 		append(id, propertyName, element, writeOptions);
 	}
 	
@@ -489,8 +498,8 @@ public class CassandraEntityPersister extends NativeEntryEntityPersister<EntityA
 		return prepareUpdate(id, update, writeOptions);
 	}
 
-	public void prepend(Object obj, String propertyName, Object element, WriteOptions writeOptions) {
-		Serializable id = (Serializable) readIdentifierFromObject(obj);
+	public void prepend(Object object, String propertyName, Object element, WriteOptions writeOptions) {
+		Serializable id = (Serializable) readIdentifierFromObject(object);
 		prepend(id, propertyName, element, writeOptions);
 	}
 	
@@ -518,8 +527,8 @@ public class CassandraEntityPersister extends NativeEntryEntityPersister<EntityA
 		return prepareUpdate(id, update, writeOptions);
 	}
 
-	public void replaceAt(Object obj, String propertyName, int index, Object element, WriteOptions writeOptions) {
-		Serializable id = (Serializable) readIdentifierFromObject(obj);
+	public void replaceAt(Object object, String propertyName, int index, Object element, WriteOptions writeOptions) {
+		Serializable id = (Serializable) readIdentifierFromObject(object);
 		replaceAt(id, propertyName, index, element, writeOptions);
 	}
 	
@@ -540,8 +549,8 @@ public class CassandraEntityPersister extends NativeEntryEntityPersister<EntityA
 		return prepareUpdate(id, update, writeOptions);
 	}
 	
-	public void deleteFrom(Object obj, String propertyName, Object item, boolean isIndex, WriteOptions writeOptions) {
-		Serializable id = (Serializable) readIdentifierFromObject(obj);
+	public void deleteFrom(Object object, String propertyName, Object item, boolean isIndex, WriteOptions writeOptions) {
+		Serializable id = (Serializable) readIdentifierFromObject(object);
 		deleteFrom(id, propertyName, item, isIndex, writeOptions);
 	}
 	

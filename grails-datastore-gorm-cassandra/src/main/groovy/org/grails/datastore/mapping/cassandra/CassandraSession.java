@@ -15,10 +15,15 @@
 package org.grails.datastore.mapping.cassandra;
 
 import java.io.Serializable;
+import java.util.Collection;
+import java.util.Map;
 
 import org.grails.datastore.mapping.cassandra.engine.CassandraEntityPersister;
+import org.grails.datastore.mapping.cassandra.utils.OptionsUtil;
 import org.grails.datastore.mapping.core.AbstractSession;
 import org.grails.datastore.mapping.core.Datastore;
+import org.grails.datastore.mapping.core.impl.PendingInsert;
+import org.grails.datastore.mapping.core.impl.PendingUpdate;
 import org.grails.datastore.mapping.engine.NonPersistentTypeException;
 import org.grails.datastore.mapping.engine.Persister;
 import org.grails.datastore.mapping.model.MappingContext;
@@ -27,11 +32,17 @@ import org.grails.datastore.mapping.transactions.SessionOnlyTransaction;
 import org.grails.datastore.mapping.transactions.Transaction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cassandra.core.CqlTemplate;
+import org.springframework.cassandra.core.WriteOptions;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.cassandra.core.CassandraTemplate;
 import org.springframework.util.Assert;
 
 import com.datastax.driver.core.Session;
+import com.datastax.driver.core.querybuilder.Batch;
+import com.datastax.driver.core.querybuilder.Insert;
+import com.datastax.driver.core.querybuilder.QueryBuilder;
+import com.datastax.driver.core.querybuilder.Update;
 
 /**
  * @author Graeme Rocher
@@ -83,20 +94,60 @@ public class CassandraSession extends AbstractSession<Session> {
         return cassandraTemplate;
     }
     
-    public Serializable update(Object o) {
-        Assert.notNull(o, "Cannot persist null object");
-        Persister persister = getPersister(o);
+    protected CassandraEntityPersister getCassandraEntityPersister(Object o) {
+		Persister persister = getPersister(o);
         if (persister == null) {
             throw new NonPersistentTypeException("Object [" + o +
                     "] cannot be persisted. It is not a known persistent type.");
-        }
-        CassandraEntityPersister cassandraEntityPersister = (CassandraEntityPersister) persister;
+        }        
+		return (CassandraEntityPersister) persister;
+	}
+    
+    public Serializable update(Object o) {
+        Assert.notNull(o, "Cannot persist null object");
+        CassandraEntityPersister cassandraEntityPersister = getCassandraEntityPersister(o);
         final Serializable key = (Serializable) cassandraEntityPersister.update(o);
         cacheObject(key, o);
         return key;
     }
+
+	
     
-    public void deleteAll(Class type) {
+    public void deleteAll(Class<?> type) {
         cassandraTemplate.truncate(cassandraTemplate.getTableName(type));
+    }
+    
+    @SuppressWarnings("rawtypes")
+	public void batchFlush(Map<String, Object> params) {    
+        boolean hasInserts = hasUpdates();
+        if (!hasInserts) {
+            return;
+        }
+        
+        Batch batch = QueryBuilder.batch();
+        final WriteOptions writeOptions = OptionsUtil.convertToWriteOptions(params);
+        CqlTemplate.addQueryOptions(batch, writeOptions);
+        
+        for ( Collection<PendingInsert> pendingInserts : getPendingInserts().values()) {
+            for (PendingInsert pendingInsert: pendingInserts) {
+                final Object object = pendingInsert.getEntityAccess().getEntity();
+                CassandraEntityPersister cassandraEntityPersister = getCassandraEntityPersister(object);
+                final Insert insert = cassandraEntityPersister.createInsert(object, writeOptions);
+                batch.add(insert);
+            }
+        }
+        getPendingInserts().clear();
+        for ( Collection<PendingUpdate> pendingUpdates : getPendingUpdates().values()) {
+            for (PendingUpdate pendingUpdate: pendingUpdates) {
+            	final Object object = pendingUpdate.getEntityAccess().getEntity();
+            	CassandraEntityPersister cassandraEntityPersister = getCassandraEntityPersister(object);
+            	final Update update = cassandraEntityPersister.createUpdate(object, writeOptions);
+            	batch.add(update);
+            }
+        }        
+        getPendingUpdates().clear();
+        cassandraTemplate.execute(batch);
+        super.flush();
+        
     }
 }

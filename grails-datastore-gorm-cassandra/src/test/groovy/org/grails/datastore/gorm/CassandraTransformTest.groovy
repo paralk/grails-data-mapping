@@ -19,7 +19,11 @@ class CassandraTransformTest extends GroovyTestCase {
         assert tableanno != null
         def field = Basic.class.getDeclaredField("id")
         assert field.getType() == UUID
-        assert field != null        
+        assert field != null       
+		def method = Basic.class.getMethod("getId", null)
+		assert method.getReturnType() == UUID 
+		method = Basic.class.getMethod("setId", UUID)
+		assert method
         def anno = field.getAnnotation(PrimaryKeyColumn)
         assert anno != null
         field = Basic.class.getDeclaredField("version")
@@ -75,6 +79,24 @@ class CassandraTransformTest extends GroovyTestCase {
         assert java.lang.reflect.Modifier.isTransient(field.getModifiers()) == true                       
     }
 
+	void testBasicWithUndefinedCustomPrimaryKey() {
+		def field = BasicWithUndefinedCustomPrimaryKey.class.getDeclaredField("primary")
+		assert field != null
+		def anno = field.getAnnotation(PrimaryKeyColumn)
+		assert anno != null
+		
+		field = BasicWithUndefinedCustomPrimaryKey.class.getDeclaredField("id")
+		assertTransientField(field)
+		assert field.getType() == Long
+		assert java.lang.reflect.Modifier.isTransient(field.getModifiers()) == true
+		
+		field = BasicWithUndefinedCustomPrimaryKey.class.getDeclaredField("version")
+		assertNonTransientField(field)
+		anno = field.getAnnotation(Column)
+		assert anno != null
+		assert anno.value() == "revision_number"
+	}
+	
     void testBasicWithPrimaryKey() {
         def field = BasicWithPrimaryKey.class.getDeclaredField("primary")
         assert field != null
@@ -83,6 +105,7 @@ class CassandraTransformTest extends GroovyTestCase {
         
         field = BasicWithPrimaryKey.class.getDeclaredField("id")
         assertTransientField(field)
+		assert field.getType() == Long
         assert java.lang.reflect.Modifier.isTransient(field.getModifiers()) == true
         
         field = BasicWithPrimaryKey.class.getDeclaredField("version")
@@ -93,25 +116,30 @@ class CassandraTransformTest extends GroovyTestCase {
         
     }
     
-    void testBasicWithCustomPrimaryKeyUndefined() {
-        def field = BasicWithCustomPrimaryKeyUndefined.class.getDeclaredField("primary")
-        assert field != null
-        def anno = field.getAnnotation(PrimaryKeyColumn)
-        assert anno != null
-        
-        field = BasicWithCustomPrimaryKeyUndefined.class.getDeclaredField("id")
-        assertTransientField(field)
-        assert java.lang.reflect.Modifier.isTransient(field.getModifiers()) == true
-        
-        field = BasicWithCustomPrimaryKeyUndefined.class.getDeclaredField("version")
-        assertNonTransientField(field)     
-        anno = field.getAnnotation(Column)
-        assert anno != null
-        assert anno.value() == "revision_number"
-    }
-    
-    void testBasicWithCustomPrimaryKeyAndAssociation() {
-        def field = BasicWithCustomPrimaryKeyAndAssociation.class.getDeclaredField("primary")
+	void testBasicWithCompositePrimaryKey() {
+		def field = BasicWithCompositePrimaryKey.class.getDeclaredField("id")
+		assert field != null
+		assert field.getType() == UUID
+		def method = Basic.class.getMethod("getId", null)
+		assert method.getReturnType() == UUID
+		method = Basic.class.getMethod("setId", UUID)
+		assert method
+		def anno = field.getAnnotation(PrimaryKeyColumn)
+		assert anno != null		
+		assert anno.ordinal() == 0
+		assert anno.type() == PrimaryKeyType.PARTITIONED
+
+		field = BasicWithCompositePrimaryKey.class.getDeclaredField("clustered")
+		assert field != null
+		anno = field.getAnnotation(PrimaryKeyColumn)
+		assert anno != null		
+		assert anno.ordinal() == 1
+		assert anno.type() == PrimaryKeyType.CLUSTERED		
+		
+	}
+	
+    void testBasicWithCompositePrimaryKeyAndAssociation() {
+        def field = BasicWithCompositePrimaryKeyAndAssociation.class.getDeclaredField("primary")
         assert field != null
         def anno = field.getAnnotation(PrimaryKeyColumn)
         assert anno != null
@@ -119,7 +147,7 @@ class CassandraTransformTest extends GroovyTestCase {
         assert anno.ordinal() == 0
         assert anno.type() == PrimaryKeyType.PARTITIONED
 
-        field = BasicWithCustomPrimaryKeyAndAssociation.class.getDeclaredField("clustered")
+        field = BasicWithCompositePrimaryKeyAndAssociation.class.getDeclaredField("clustered")
         assert field != null
         anno = field.getAnnotation(PrimaryKeyColumn)
         assert anno != null
@@ -127,9 +155,13 @@ class CassandraTransformTest extends GroovyTestCase {
         assert anno.ordinal() == 1
         assert anno.type() == PrimaryKeyType.CLUSTERED
 
-        assertTransientField(BasicWithCustomPrimaryKeyAndAssociation.class.getDeclaredField("association"))
+        assertTransientField(BasicWithCompositePrimaryKeyAndAssociation.class.getDeclaredField("association"))
 
-        assertTransientField(BasicWithCustomPrimaryKeyAndAssociation.class.getDeclaredField("id"))
+		field = BasicWithCompositePrimaryKeyAndAssociation.class.getDeclaredField("id")
+		assertTransientField(field)
+		assert field.getType() == Map 
+		def method = BasicWithCompositePrimaryKeyAndAssociation.class.getMethod("getId", null)
+		assert method.getReturnType() == Map
         
     }
 
@@ -163,7 +195,9 @@ class CassandraTransformTest extends GroovyTestCase {
         anno = field.getAnnotation(Indexed)
         assert anno != null
 
-        assertTransientField(Person.class.getDeclaredField("id"))
+		field = Person.class.getDeclaredField("id")
+        assertTransientField(field)
+		assert field.getType() == Map
                 
     }
     
@@ -251,16 +285,7 @@ class BasicWithIdAndTypes {
 }
 
 @Entity
-class BasicWithPrimaryKey {
-    UUID primary   
-    static mapping = {  
-        id name:"primary", column:"primary_key"   
-        version "revision_number"         
-    }
-}
-
-@Entity
-class BasicWithCustomPrimaryKeyUndefined {
+class BasicWithUndefinedCustomPrimaryKey {
     long version
     static mapping = {
         id name:"primary", column:"primary_key"      
@@ -269,7 +294,27 @@ class BasicWithCustomPrimaryKeyUndefined {
 }
 
 @Entity
-class BasicWithCustomPrimaryKeyAndAssociation {
+class BasicWithPrimaryKey {
+	UUID primary
+	static mapping = {
+		id name:"primary", column:"primary_key"
+		version "revision_number"
+	}
+}
+
+@Entity
+class BasicWithCompositePrimaryKey {
+	UUID clustered
+	BasicWithPrimaryKey association
+
+	static mapping = {
+		id primaryKey:[ordinal:0, type:"partitioned"]
+		clustered primaryKey:[ordinal:1, type: "clustered"]
+	}
+}
+
+@Entity
+class BasicWithCompositePrimaryKeyAndAssociation {
     UUID primary
     UUID clustered
     BasicWithPrimaryKey association

@@ -7,7 +7,7 @@ class GormToCassandraTest {
         
     }             
     
-    @Entity
+    //@Entity
     static class ABasic {        
        String name
        Long version
@@ -19,8 +19,24 @@ class GormToCassandraTest {
        static mapWith = "cassandra"
     }
     
-    @Entity
-    static class ABasicWithId {
+	@Entity
+	static class ABasicIdWithUndefinedOtherNamedPrimaryKey {
+		static mapping = {
+			id name:"other"
+		}
+	}
+   
+	@Entity
+	static class ABasicWithDefinedOtherNamePrimaryKey {
+		UUID primary
+		static mapping = {
+			id name:"primary"
+			version "revision_number"
+		}
+		static mapWith = "Cassandra"
+	}
+	
+    static class ABasicWithIdAndTypes {
         UUID id
         String value
         String ascii
@@ -47,24 +63,26 @@ class GormToCassandraTest {
             'transientBoolean',
             'transientString'
         ]               
-    }
+    }        
     
+	@Entity
+	static class ABasicCompositePrimaryKey {		
+		UUID clustered
+		ABasic association
+
+		static mapping = {
+			id primaryKey:[ordinal:0, type:"partitioned"]
+			clustered primaryKey:[ordinal:1, type: "clustered"]
+		}
+		
+		//static mapWith = "other"
+	}
+	
     @Entity
-    static class ABasicWithPrimaryKey {
-        UUID primary
-        long id
-        static mapping = { 
-            id name:"primary" 
-            version "revision_number"
-        }
-        static mapWith = "Cassandra"
-    }
-    
-    @Entity
-    static class ABasicCustomPrimaryKeyWithAssociation {
+    static class ABasicCompositePrimaryKeyWithAssociation {
         UUID primary
         UUID clustered
-        ABasicWithPrimaryKey association
+        ABasic association
 
         static mapping = {
             id name:"primary", column:"pri", primaryKey:[ordinal:0, type:"partitioned"]
@@ -74,7 +92,7 @@ class GormToCassandraTest {
         //static mapWith = "other"
     }
 
-    @Entity
+    //@Entity
     static class APerson {
         String lastname
         String firstname

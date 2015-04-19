@@ -22,7 +22,7 @@ abstract class GormDatastoreSpec extends Specification {
 
     static final CURRENT_TEST_NAME = "current.gorm.test"
     static final SETUP_CLASS_NAME = 'org.grails.datastore.gorm.Setup'
-    static final TEST_CLASSES = [Artist, Book, City, ClassWithListArgBeforeValidate, ClassWithNoArgBeforeValidate, 
+    static final TEST_CLASSES = [Person, PersonLastNamePartitionKey, TestEntity] /*[Artist, Book, City, ClassWithListArgBeforeValidate, ClassWithNoArgBeforeValidate, 
             ClassWithOverloadedBeforeValidate, CommonTypes, Country, Dog, EnumThingEnumPartitionKey, 
             EnumThing, GroupWithin, Highway, Location, ModifyPerson, OptLockNotVersioned, OptLockVersioned, 
             Person, PersonEvent, PersonLastNamePartitionKey, Plant, Publication, PublicationTitlePartitionKey, 
